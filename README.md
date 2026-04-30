@@ -2,7 +2,7 @@
 
 # Indeed Scraper API
 
-Search Indeed job listings and get full posting details — title, salary, company, qualifications, benefits — as structured JSON via a simple REST API. 5,000 free requests/month.
+Search Indeed job listings and get full posting details — title, salary, company, qualifications, benefits — as structured JSON via a simple REST API. 100 free requests/month.
 
 ## Key Features
 
@@ -10,7 +10,7 @@ Search Indeed job listings and get full posting details — title, salary, compa
 - Get full job details: salary range, benefits, qualifications, description HTML
 - Company metadata including ratings and review counts
 - Pagination support for large result sets
-- **5,000 requests/month on free tier**
+- **100 requests/month on free tier**
 - Example Response:
 ```json
 {
@@ -30,7 +30,7 @@ Search Indeed job listings and get full posting details — title, salary, compa
 
 Create an account at [omkar.cloud](https://www.omkar.cloud/auth/sign-up?redirect=/api-key) to get your API key.
 
-It takes just 2 minutes to sign up. You get 5,000 free requests every month for detailed Indeed data — more than enough for most users to get their job done without paying a dime.
+It takes just 2 minutes to sign up. You get 100 free requests every month for detailed Indeed data.
 
 This is a well built product, and your search for the best Indeed Scraper API ends right here.
 
@@ -298,10 +298,10 @@ Data is pulled from Indeed in real time. Every API call fetches live listings �
 
 | Plan | Price | Requests/Month |
 |------|-------|----------------|
-| Free | $0 | 5,000 |
-| Starter | $25 | 100,000 |
-| Grow | $75 | 1,000,000 |
-| Scale | $150 | 10,000,000 |
+| Free | $0 | 100 |
+| Starter | $16 | 3,000 |
+| Grow | $48 | 15,000 |
+| Scale | $148 | 75,000 |
 
 ## Questions? We have answers.
 

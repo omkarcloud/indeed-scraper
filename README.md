@@ -1,312 +1,153 @@
-![Indeed Scraper Featured Image](https://raw.githubusercontent.com/omkarcloud/indeed-scraper/master/indeed-scraper-featured-image.png)
+# 💼 Indeed Scraper
 
-# Indeed Scraper API
+Indeed Scraper is a **free and open-source** scraper that gets you **unlimited** detailed Indeed data for free.
 
-Search Indeed job listings and get full posting details — title, salary, company, qualifications, benefits — as structured JSON via a simple REST API. 100 free requests/month.
+## ✨ What Can I Get?
 
-## Key Features
+- 💼 **Search 3M+ live jobs** — full descriptions, salaries, benefits, skills & company ratings
+- 🏢 **Full company profiles** — ratings, CEO, size, revenue, top salaries & happiness scores
+- ⭐ **Employee reviews & Q&A** — sub-ratings, pros & cons, job titles & top answers
+- 💰 **Salaries for any job in 62 countries** — median & range per hour to year, by state, city & company
 
-- Search jobs by keyword with optional location filtering
-- Get full job details: salary range, benefits, qualifications, description HTML
-- Company metadata including ratings and review counts
-- Pagination support for large result sets
-- **100 requests/month on free tier**
-- Example Response:
+## 🎥 Example: A Full Indeed Job
+
 ```json
 {
-  "job_id": "a8f3e9c2d4b617fa",
-  "title": "Senior Software Engineer, Cloud Infrastructure",
-  "company": "Apple",
-  "company_rating": 4.3,
-  "location": "Cupertino, CA 95014",
-  "remote_work_model": "hybrid",
-  "salary_snippet": "$175,000 - $250,000 a year",
-  "job_type": "Full-time",
-  "posted_at": "3 days ago"
+  "id": "a8989ea0f3a3fef0",
+  "title": "Software Engineer (Technical Leadership)",
+  "normalized_title": "Software Engineer",
+  "link": "https://www.indeed.com/viewjob?jk=a8989ea0f3a3fef0",
+  "is_easy_apply": false,
+  "company": {
+    "id": "b1f359487c26ba41",
+    "name": "Meta",
+    "link": "https://www.indeed.com/cmp/Meta-dd1502f2",
+    "rating": 4.0,
+    "review_count": 1132
+  },
+  "location": {
+    "display_name": "Menlo Park, CA 94025",
+    "address": "1 Hacker Way",
+    "city": "Menlo Park",
+    "state_code": "CA",
+    "latitude": 37.484447,
+    "longitude": -122.148125
+  },
+  "salary": { "min": 271000, "max": 347000, "currency": "USD", "period": "yearly", "text": "$271,000 - $347,000 a year" },
+  "experience_level": "senior_level",
+  "experience_required": ["5 years"],
+  "benefits": ["Bonus opportunities"],
+  "skills": ["AI models", "Roadmap creation (System development task)", "Feature prioritization"],
+  "description": "Meta is seeking an experienced Software Engineer to join the Software Engineering (Infrastructure) team. The Software Engineering (Infrastructure) team builds large distributed components that run Facebook...",
+  "date_published": "2026-09-24"
 }
 ```
 
-## Get API Key
+*Trimmed for readability.*
 
-Create an account at [omkar.cloud](https://www.omkar.cloud/auth/sign-up?redirect=/api-key) to get your API key.
+## 🚀 Unlimited Free Indeed Data — Get It in 60 Seconds
 
-It takes just 2 minutes to sign up. You get 100 free requests every month for detailed Indeed data.
-
-This is a well built product, and your search for the best Indeed Scraper API ends right here.
-
-
-## Quick Start
-
+1️⃣ Clone and install:
 ```bash
-curl -X GET "https://indeed-scraper.omkar.cloud/indeed/search?search_term=software%20engineer&location=New%20York" \
-  -H "API-Key: YOUR_API_KEY"
+git clone https://github.com/omkarcloud/indeed-scraper
+cd indeed-scraper
+python -m pip install -r requirements.txt
+```
+
+2️⃣ Start the API:
+```bash
+python run.py
+```
+
+3️⃣ Get your first data:
+```bash
+curl "http://localhost:8000/jobs/search?query=software+engineer&location=San+Francisco,+CA"
 ```
 
 ```json
 {
-  "total_results": 4283,
+  "count": 3649,
+  "per_page": 20,
+  "current_page": 1,
+  "total_pages": 50,
+  "next": "http://localhost:8000/jobs/search?query=software+engineer&location=San+Francisco%2C+CA&page=2",
   "jobs": [
     {
-      "job_id": "a8f3e9c2d4b617fa",
-      "title": "Senior Software Engineer, Cloud Infrastructure",
-      "company": "Apple",
-      "company_rating": 4.3,
-      "location": "Cupertino, CA 95014",
-      "remote_work_model": "hybrid",
-      "salary_snippet": "$175,000 - $250,000 a year",
-      "job_type": "Full-time",
-      "posted_at": "3 days ago"
+      "id": "5716bd4abb9670a6",
+      "title": "Senior Software Engineer (Backend/Product focus, AIaaS)",
+      "link": "https://www.indeed.com/viewjob?jk=5716bd4abb9670a6",
+      "company": { "name": "Roblox", "rating": 4.1 },
+      "location": { "display_name": "San Mateo, CA" },
+      "salary": { "min": 243290, "max": 295250, "currency": "USD", "period": "yearly" },
+      "job_types": ["Full-time"],
+      "date_published": "2026-09-25"
     }
   ]
 }
 ```
 
-## Quick Start (Python)
+All 14 endpoints are now live at `http://localhost:8000`.
 
-```bash
-pip install requests
-```
+## 📚 Endpoints
 
-```python
-import requests
+14 endpoints cover everything you need.
 
-response = requests.get(
-    "https://indeed-scraper.omkar.cloud/indeed/search",
-    params={"search_term": "software engineer", "location": "New York"},
-    headers={"API-Key": "YOUR_API_KEY"}
-)
+| Endpoint | Path | Returns |
+|---|---|---|
+| Search Jobs | `/jobs/search` | 20 jobs per page with full descriptions, salaries and ratings |
+| Job Details / Batch | `/jobs/details`, `/jobs/batch` | One job, or up to 20, with the full company profile |
+| Company Details | `/companies/details` | Ratings, CEO, size, revenue and top salaries in one call |
+| Company Reviews | `/companies/reviews` | Employee reviews, 20 per page, with pros, cons and sub-ratings |
+| Company Salaries | `/companies/salaries` | Median pay for 100 job titles, or one title in depth |
+| Salaries by Job Title | `/salaries` | Pay for any job by state, city and top-paying company |
+| Company Jobs | `/companies/jobs` | Every open job at one company, 20 per page |
+| Company Questions | `/companies/questions` | Employee Q&A with top answers, 10 per page |
+| Company Locations | `/companies/locations` | Every office state and city with its rating |
+| Search Companies | `/companies/search` | Companies by name with rating, reviews and sector |
+| Job Search Filters | `/jobs/filters` | Job counts by date, attribute, occupation and city |
+| Autocomplete / Countries | `/autocomplete`, `/countries` | Search-box suggestions and all 62 Indeed country sites |
 
-print(response.json())
-```
 
+## 🔍 Exploring Parameters
 
-## API Reference
+The same API is published on RapidAPI, and its playground is the easiest place to try parameters and see raw responses. Once a request looks right, run it locally for **unlimited free** data.
 
-### Search Jobs
-
-```
-GET https://indeed-scraper.omkar.cloud/indeed/search
-```
-
-#### Parameters
-
-| Parameter | Required | Default | Description |
-|-----------|----------|---------|-------------|
-| `search_term` | Yes | — | Job title, skill, or company keyword used to find matching listings. |
-| `location` | No | — | City, state, or region to narrow the job search. |
-| `page` | No | `1` | Page number for paginated results. |
-
-#### Example
+1. [Subscribe to the free plan](https://rapidapi.com/OmkarCloud/api/best-indeed-scraper-free-1000-calls/pricing) — 1,000 calls/month, no credit card.
+2. [Try the endpoints in the playground](https://rapidapi.com/OmkarCloud/api/best-indeed-scraper-free-1000-calls/playground) — every param is pre-filled, so you see real data in one click.
+3. Copy the generated code and replace `https://best-indeed-scraper-free-1000-calls.p.rapidapi.com` with `http://localhost:8000`. It will now run against your local API.
 
 ```python
 import requests
 
+# generated by the playground, host swapped for the local API
 response = requests.get(
-    "https://indeed-scraper.omkar.cloud/indeed/search",
-    params={"search_term": "software engineer", "location": "New York"},
-    headers={"API-Key": "YOUR_API_KEY"}
+    "http://localhost:8000/jobs/search",
+    params={"query": "software engineer", "location": "San Francisco, CA"},
 )
-
 print(response.json())
 ```
 
-#### Response
+## 💬 Have Questions? We Have Answers.
 
-<details>
-<summary>Sample Response (click to expand)</summary>
+You're a developer — we know how hard completing a project can be. So we offer full support: just message us and we'll reply ✅ with a solution within 1 working day.
 
-```json
-{
-    "total_results": 4283,
-    "jobs": [
-      {
-        "job_id": "a8f3e9c2d4b617fa",
-        "title": "Senior Software Engineer, Cloud Infrastructure",
-        "company": "Apple",
-        "company_rating": 4.3,
-        "company_reviews_count": 24817,
-        "location": "Cupertino, CA 95014",
-        "remote_work_model": "hybrid",
-        "salary_snippet": "$175,000 - $250,000 a year",
-        "job_type": "Full-time",
-        "posted_at": "3 days ago",
-        "description_snippet": "Build and scale the cloud infrastructure behind iCloud, Apple Music, and Apple TV+. Work with distributed systems at massive scale serving hundreds of millions of users...",
-        "job_url": "https://www.indeed.com/viewjob?jk=a8f3e9c2d4b617fa",
-        "is_sponsored": false
-      },
-      {
-        "job_id": "7b21d0e5f8ca49a3",
-        "title": "Machine Learning Engineer, Siri",
-        "company": "Apple",
-        "company_rating": 4.3,
-        "company_reviews_count": 24817,
-        "location": "Seattle, WA 98109",
-        "remote_work_model": "on-site",
-        "salary_snippet": "$190,000 - $280,000 a year",
-        "job_type": "Full-time",
-        "posted_at": "Just posted",
-        "description_snippet": "Join the Siri team to develop and deploy on-device ML models for natural language understanding. Deep experience with PyTorch, transformer architectures, and on-device optimization required...",
-        "job_url": "https://www.indeed.com/viewjob?jk=7b21d0e5f8ca49a3",
-        "is_sponsored": false
-      },
-      {
-        "job_id": "e4c6a1b9d3f285e7",
-        "title": "iOS Software Engineer",
-        "company": "Apple",
-        "company_rating": 4.3,
-        "company_reviews_count": 24817,
-        "location": "Austin, TX 78727",
-        "remote_work_model": "on-site",
-        "salary_snippet": "$140,000 - $210,000 a year",
-        "job_type": "Full-time",
-        "posted_at": "1 week ago",
-        "description_snippet": "Work on core iOS frameworks used by millions of developers worldwide. You will design and implement APIs in Swift and Objective-C that ship on every iPhone, iPad, and Mac...",
-        "job_url": "https://www.indeed.com/viewjob?jk=e4c6a1b9d3f285e7",
-        "is_sponsored": true
-      }
-    ]
-}
-```
+[![Message Us on WhatsApp about Indeed Scraper](https://raw.githubusercontent.com/omkarcloud/assets/master/images/whatsapp-us.png)](https://api.whatsapp.com/send?phone=918178804274&text=I%20need%20help%20using%20the%20Indeed%20Scraper%20API.)
 
-</details>
+[![Ask Us by Email about Indeed Scraper](https://raw.githubusercontent.com/omkarcloud/assets/master/images/ask-on-email.png)](mailto:happy.to.help@omkar.cloud?subject=Help%20with%20Indeed%20Scraper%20API&body=I%20need%20help%20using%20the%20Indeed%20Scraper%20API.)
 
----
+## ⚡ Popular Scrapers by Omkar Cloud
 
-### Job Details
+- [**Google Maps Scraper (3,100+ GitHub Stars)**](https://github.com/omkarcloud/google-maps-scraper) — type "dentists in New York", get every business as a ready-to-call lead list: phones, emails, websites & reviews. Up to 100K free leads/month.
+- [**G2 Scraper**](https://www.omkar.cloud/tools/g2-scraper) — G2 product details, ratings & AI-found contacts
+- [**Website Email Contact Scraper**](https://www.omkar.cloud/tools/website-email-contact-scraper) — emails, phones & socials from any website
+- [**AliExpress Scraper**](https://www.omkar.cloud/tools/aliexpress-scraper) — live product details, SKU variants, stock & shipping
+- [**Booking Scraper**](https://www.omkar.cloud/tools/booking-scraper) — Booking.com hotels: prices, ratings, rooms & amenities
+- [**Etsy Scraper**](https://www.omkar.cloud/tools/etsy-scraper) — Etsy products: prices, discounts, shops & variations
 
-```
-GET https://indeed-scraper.omkar.cloud/indeed/job
-```
+## ⭐ Love It? [Star It ⭐!](https://github.com/omkarcloud/indeed-scraper)
 
-#### Parameters
+Star the repo ⭐ and become my star hero!
 
-| Parameter | Required | Default | Description |
-|-----------|----------|---------|-------------|
-| `job_id` | Yes | — | Unique Indeed job posting identifier (the `jk` value from a listing URL). |
+It's just 1 click, but it means the world to me.
 
-#### Example
-
-```python
-import requests
-
-response = requests.get(
-    "https://indeed-scraper.omkar.cloud/indeed/job",
-    params={"job_id": "a8f3e9c2d4b617fa"},
-    headers={"API-Key": "YOUR_API_KEY"}
-)
-
-print(response.json())
-```
-
-#### Response Fields
-
-Returns full job posting data including title, structured salary (min/max/currency/period), description HTML, benefits list, qualifications, company metadata with logo, and apply URL.
-
-<details>
-<summary>Sample Response (click to expand)</summary>
-
-```json
-{
-    "job_id": "a8f3e9c2d4b617fa",
-    "title": "Senior Software Engineer, Cloud Infrastructure",
-    "company": "Apple",
-    "company_rating": 4.3,
-    "company_reviews_count": 24817,
-    "company_logo_url": "https://d2q79iu7y748jz.cloudfront.net/s/_squarelogo/128x128/apple_logo.png",
-    "location": "Cupertino, CA 95014",
-    "remote_work_model": "hybrid",
-    "salary": {
-      "min": 175000,
-      "max": 250000,
-      "currency": "USD",
-      "period": "yearly"
-    },
-    "job_type": "Full-time",
-    "posted_at": "3 days ago",
-    "description_html": "<p><b>About the role</b></p><p>Apple's Cloud Services team is looking for a Senior Software Engineer to build and scale the infrastructure behind iCloud, Apple Music, and Apple TV+. You will work on distributed systems serving hundreds of millions of users worldwide.</p><ul><li>Design and implement highly available services processing millions of requests per second</li><li>Collaborate with security and privacy teams to uphold Apple's commitment to user data protection</li></ul><p><b>Qualifications</b></p><ul><li>7+ years of professional software engineering experience</li><li>Strong proficiency in Java, Go, or Scala</li><li>Deep experience with distributed systems, Kubernetes, and large-scale data pipelines</li><li>Track record of designing systems that operate at Apple-level scale</li></ul>",
-    "benefits": [
-      "Health and dental insurance",
-      "401(k) matching",
-      "Employee stock purchase plan",
-      "Flexible work schedule",
-      "Product discounts",
-      "Wellness reimbursement"
-    ],
-    "qualifications": [
-      "7+ years of professional software engineering experience",
-      "Strong proficiency in Java, Go, or Scala",
-      "Deep experience with distributed systems and Kubernetes"
-    ],
-    "job_url": "https://www.indeed.com/viewjob?jk=a8f3e9c2d4b617fa",
-    "apply_url": "https://www.indeed.com/applystart?jk=a8f3e9c2d4b617fa",
-    "is_sponsored": false
-}
-```
-
-</details>
-
-## Error Handling
-
-```python
-response = requests.get(
-    "https://indeed-scraper.omkar.cloud/indeed/search",
-    params={"search_term": "data engineer"},
-    headers={"API-Key": "YOUR_API_KEY"}
-)
-
-if response.status_code == 200:
-    data = response.json()
-elif response.status_code == 401:
-    # Invalid API key
-    pass
-elif response.status_code == 429:
-    # Rate limit exceeded
-    pass
-```
-
-## FAQs
-
-### What data does the Search Jobs endpoint return?
-
-Per job listing:
-- Job ID, title, company name, and company rating
-- Location and remote work model (remote, hybrid, on-site)
-- Salary snippet and job type (full-time, part-time, contract)
-- Posting age, description snippet, and direct job URL
-- Sponsored flag
-
-All in structured JSON. Ready to use in your app.
-
-### What extra data does Job Details return over Search?
-
-Job Details gives you everything Search returns, plus:
-- Full description as HTML
-- Structured salary breakdown (min, max, currency, period)
-- Benefits list and qualifications list
-- Company logo URL and review count
-- Direct apply URL
-
-### Can I filter jobs by location?
-
-Yes. Pass the `location` parameter with any city, state, or region (e.g., `New York, NY`, `Remote`, `San Francisco`). If omitted, results are returned for all locations.
-
-### How accurate is the data?
-
-Data is pulled from Indeed in real time. Every API call fetches live listings — not cached or stale results. Job titles, salaries, and posting dates reflect what's on Indeed right now.
-
-## Rate Limits
-
-| Plan | Price | Requests/Month |
-|------|-------|----------------|
-| Free | $0 | 100 |
-| Starter | $16 | 3,000 |
-| Grow | $48 | 15,000 |
-| Scale | $148 | 75,000 |
-
-## Questions? We have answers.
-
-Reach out anytime. We will solve your query within 1 working day.
-
-[![Contact Us on WhatsApp about Indeed Scraper](https://raw.githubusercontent.com/omkarcloud/assets/master/images/whatsapp-us.png)](https://api.whatsapp.com/send?phone=918178804274&text=I%20have%20a%20question%20about%20the%20Indeed%20Scraper%20API.)
-
-[![Contact Us on Email about Indeed Scraper](https://raw.githubusercontent.com/omkarcloud/assets/master/images/ask-on-email.png)](mailto:happy.to.help@omkar.cloud?subject=Indeed%20Scraper%20API%20Question)
+[![Star us on GitHub](https://raw.githubusercontent.com/omkarcloud/google-maps-scraper/master/screenshots/star-us.png)](https://github.com/omkarcloud/indeed-scraper)

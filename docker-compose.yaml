@@ -1,0 +1,11 @@
+services:
+  indeed-scraper:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      # Optional — jobs never need it. For company pages from a cloud server,
+      # use a ROTATING residential proxy (Indeed's company pages use Cloudflare).
+      # - INDEED_PROXY=http://user:pass@host:port

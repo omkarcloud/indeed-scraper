@@ -33,11 +33,12 @@ Indeed bot-detection login on every exit) — GraphQL replaces both.
 
 Failure taxonomy (scraper_errors, mapped to HTTP by route_glue):
   IndeedUpstreamError  transport failure / 5xx / unexpected body — retryable
-  IndeedBlocked        Cloudflare challenge on every exit          — retryable
+  IndeedBlocked        Cloudflare challenge on every exit — retryable
   IndeedBadRequest     Indeed rejected the params                   — never retried
   IndeedNotFound       no such job / company / page                 — never retried
 """
 import json
+import fastjson
 import os
 import re
 import sys
@@ -49,9 +50,12 @@ from urllib.parse import urlencode
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import browser_client
 import config
+import egress
 from scraper_errors import BadRequest, Blocked, NotFound, UpstreamError
 from indeed import shared as S
+from scraper_utils import debug, fanout, memo, sessions
 
 GRAPHQL_URL = "https://apis.indeed.com/graphql"
 AUTOCOMPLETE_URL = "https://autocomplete.indeed.com/api/v0/suggestions/{kind}"
@@ -67,14 +71,14 @@ GRAPHQL_HEADERS = {
     "accept": "application/json",
     "indeed-api-key": APP_API_KEY,
     "indeed-locale": "en-US",          # English attribute labels in every country
-    "accept-language": "en-US,en;q=0.9",
+    "accept-language": egress.site_accept_language("indeed"),
     "user-agent": ("Mozilla/5.0 (iPhone; CPU iPhone OS 16_6_1 like Mac OS X) AppleWebKit/605.1.15 "
                    "(KHTML, like Gecko) Mobile/15E148 Indeed App 193.1"),
     "indeed-app-info": "appv=193.1; appid=com.indeed.jobsearch; osv=16.6.1; os=ios; dtype=phone",
 }
 PAGE_HEADERS = {"accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                "accept-language": "en-US,en;q=0.9"}
-JSON_HEADERS = {"accept": "application/json, text/plain, */*", "accept-language": "en-US,en;q=0.9"}
+                "accept-language": egress.site_accept_language("indeed")}
+JSON_HEADERS = {"accept": "application/json, text/plain, */*", "accept-language": egress.site_accept_language("indeed")}
 
 CF_MARKERS = ("just a moment", "security check", "attention required", "cf-chl", "challenge-platform")
 COMP_DATA_RE = re.compile(r'<script id="comp-initialData" type="application/json">(.*?)</script>', re.S)
@@ -103,14 +107,7 @@ class IndeedQueryError(IndeedUpstreamError):
 
 def dump_debug(name, text):
     """Write a raw response to $INDEED_DEBUG_DIR/<name>.txt."""
-    dbg = os.environ.get("INDEED_DEBUG_DIR", "")
-    if dbg and text:
-        try:
-            os.makedirs(dbg, exist_ok=True)
-            with open(os.path.join(dbg, name + ".txt"), "w") as f:
-                f.write(text)
-        except OSError:
-            pass
+    debug.dump("INDEED_DEBUG_DIR", name, text)
 
 
 # ---- curl sessions ---------------------------------------------------------------------
@@ -120,10 +117,7 @@ _local = threading.local()
 
 
 def _sessions():
-    store = getattr(_local, "sessions", None)
-    if store is None:
-        store = _local.sessions = OrderedDict()
-    return store
+    return sessions.thread_store(_local)
 
 
 def _session(key, proxy, impersonate):
@@ -147,12 +141,7 @@ def _session(key, proxy, impersonate):
 
 
 def _drop_session(key):
-    sess = _sessions().pop(key, None)
-    if sess is not None:
-        try:
-            sess.close()
-        except Exception:
-            pass
+    sessions.drop_keyed(_sessions(), key)
 
 
 # ---- GraphQL ------------------------------------------------------------------------------
@@ -168,7 +157,7 @@ def _classify_graphql(status, text, label):
     if status >= 500:
         raise IndeedUpstreamError(f"HTTP {status} from apis.indeed.com on {label}")
     try:
-        body = json.loads(text or "")
+        body = fastjson.loads(text or "")
     except ValueError:
         dump_debug("graphql_non_json", text)
         raise IndeedUpstreamError(f"non-JSON GraphQL answer (HTTP {status}) on {label}")
@@ -309,73 +298,36 @@ def _curl_page(url, label, fresh):
         raise
 
 
-# ---- web pages: browser fallback --------------------------------------------------------------
+# ---- web pages: browser fallback (on the browser box) ------------------------------------------
 
-_browser_slots = threading.BoundedSemaphore(max(1, int(config.INDEED_BROWSER_CONCURRENCY)))
-
-
-def _click_turnstile(page):
-    """Real mouse click on the Cloudflare Turnstile checkbox, when shown."""
-    import random
-    for frame in page.frames:
-        if not frame.url.startswith("https://challenges.cloudflare.com"):
-            continue
-        try:
-            box = frame.frame_element().bounding_box()
-        except Exception:
-            box = None
-        if not box or box.get("width", 0) < 50:
-            continue
-        x = box["x"] + box["width"] / 9 + random.uniform(-4, 4)
-        y = box["y"] + box["height"] / 2 + random.uniform(-4, 4)
-        page.mouse.move(x, y, steps=random.randint(10, 25))
-        page.wait_for_timeout(random.randint(100, 300))
-        page.mouse.down()
-        page.wait_for_timeout(random.randint(50, 150))
-        page.mouse.up()
-        return True
-    return False
+# Sticky exits for the box browsers: one proxy URL = one kept Chrome on the
+# box, parked on robots.txt with its Turnstile clearance and retired after
+# max_uses pages (recipes/indeed.py, = INDEED_WEB_REQUESTS_PER_EXIT). Until
+# 2026-11-04 every fallback call minted a fresh exit, so every call launched
+# a Chrome and cleared Turnstile again. burst=True: INDEED_BROWSER_SLOTS x
+# BROWSER_BURST_FACTOR candidates; the box opens the extra ones with headroom.
+_BROWSER_EXITS = browser_client.ExitPool("indeed", config.indeed_web_proxy,
+                                         size=lambda: config.INDEED_BROWSER_SLOTS, burst=True,
+                                         uses_per_exit=lambda: config.INDEED_WEB_REQUESTS_PER_EXIT)
 
 
 def _browser_page(url, label):
-    """One headful patchright Chrome on a fresh exit: load the page, click
-    Turnstile when shown, return the rendered HTML once the real page is up."""
-    from chrome_manager import create_scope
-    from patchright_driver import PatchrightDriver
-
-    driver = None
-    with _browser_slots:
-        try:
-            with create_scope():
-                driver = PatchrightDriver(proxy_url=config.indeed_web_proxy(), headless=False)
-            driver.call(lambda page: page.goto(url, wait_until="domcontentloaded", timeout=60000))
-            deadline = time.monotonic() + float(config.INDEED_BROWSER_TIMEOUT)
-            last_click = 0.0
-            while time.monotonic() < deadline:
-                try:
-                    html = driver.content() or ""
-                except Exception:
-                    html = ""          # mid-navigation (the challenge reloads the page)
-                # only the real page carries the data script; Cloudflare's
-                # interstitial and Indeed's "Authenticating…" page do not
-                if COMP_DATA_RE.search(html) or NEXT_DATA_RE.search(html):
-                    return classify_page(200, {}, html, url, label)
-                if "<title>not found | indeed" in html[:20000].lower():
-                    raise IndeedNotFound(f"Indeed has no page for {label}")
-                if time.monotonic() - last_click > 6:
-                    try:
-                        if driver.call(_click_turnstile):
-                            last_click = time.monotonic()
-                    except Exception:
-                        pass
-                time.sleep(1.0)
-            raise IndeedBlocked(f"Cloudflare challenge did not clear in a browser on {label}")
-        finally:
-            if driver is not None:
-                try:
-                    driver.close()
-                except Exception:
-                    pass
+    """On the browser box (recipes/indeed.py): a Chrome on one of the sticky
+    exits (_BROWSER_EXITS) loads the page, clicks Turnstile when shown and
+    returns the HTML once the real page is up (404 when Indeed has no such
+    page). A refused exit (Indeed's 401 check on a flagged exit shows as a
+    settle timeout) is rotated. Chrome left GKE 2026-10-22."""
+    try:
+        _proxy, res = _BROWSER_EXITS.fetch_any("indeed", url=url)
+    except browser_client.BoxRefused as e:
+        if e.candidate is not None:
+            _BROWSER_EXITS.rotate(e.proxy)
+        raise IndeedBlocked(f"{label}: refused in the box browser: {e}") from e
+    except browser_client.BoxUnavailable as e:
+        raise IndeedUpstreamError(f"{label}: browser box unavailable: {e}") from e
+    if int(res.get("status") or 0) == 404:
+        raise IndeedNotFound(f"Indeed has no page for {label}")
+    return classify_page(200, {}, res.get("body") or "", url, label)
 
 
 # ---- web pages: public ------------------------------------------------------------------------
@@ -421,7 +373,7 @@ def extract_comp_data(html):
     if not match:
         return None
     try:
-        return json.loads(match.group(1))
+        return fastjson.loads(match.group(1))
     except ValueError:
         return None
 
@@ -442,7 +394,7 @@ def extract_next_data(html):
     if not match:
         return None
     try:
-        return ((json.loads(match.group(1)).get("props") or {}).get("pageProps")) or None
+        return ((fastjson.loads(match.group(1)).get("props") or {}).get("pageProps")) or None
     except ValueError:
         return None
 
@@ -501,19 +453,7 @@ MEMO_MAX = 256
 
 
 def memoized(key, fn, ttl=MEMO_TTL):
-    now = time.monotonic()
-    with _memo_lock:
-        hit = _memo.get(key)
-        if hit and now - hit[0] < ttl:
-            _memo.move_to_end(key)
-            return hit[1]
-    value = fn()
-    with _memo_lock:
-        _memo[key] = (now, value)
-        _memo.move_to_end(key)
-        while len(_memo) > MEMO_MAX:
-            _memo.popitem(last=False)
-    return value
+    return memo.memoized(_memo, _memo_lock, MEMO_MAX, key, fn, ttl)
 
 
 def shared_raw(name, params, build, ttl):
@@ -529,15 +469,7 @@ def shared_raw(name, params, build, ttl):
 def run_parallel(fns, workers):
     """Run zero-arg callables in parallel; results align with `fns`. Each
     result is ("ok", value) or ("error", exception)."""
-    def guard(fn):
-        try:
-            return ("ok", fn())
-        except Exception as e:
-            return ("error", e)
-    if not fns:
-        return []
-    with ThreadPoolExecutor(max_workers=max(1, min(workers, len(fns)))) as ex:
-        return list(ex.map(guard, fns))
+    return fanout.guarded_per_call(fns, workers)
 
 
 if __name__ == "__main__":

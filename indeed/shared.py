@@ -1,43 +1,15 @@
 """Value helpers shared by every Indeed parser: numbers, text, dates, money,
 salary periods and links. Pure functions, no network; every helper tolerates
 None and junk."""
-import html as html_lib
 import re
 from datetime import datetime, timedelta, timezone
 
 from indeed import refdata
+from scraper_utils.text import clean as text, lower_snake, multiline
+from scraper_utils.dates import iso_date
+from scraper_utils.values import amount, num, rating, rounded, to_int_round as to_int
 
 # ---- numbers --------------------------------------------------------------------------
-
-def num(value):
-    """int / float / numeric string ('1,234.5') -> float; bool, junk, NaN -> None."""
-    if value is None or isinstance(value, bool):
-        return None
-    if isinstance(value, (int, float)):
-        return float(value) if value == value else None
-    try:
-        out = float(str(value).strip().replace(",", ""))
-    except ValueError:
-        return None
-    return out if out == out else None
-
-
-def to_int(value):
-    out = num(value)
-    return int(round(out)) if out is not None else None
-
-
-def rounded(value, digits=2):
-    out = num(value)
-    return round(out, digits) if out is not None else None
-
-
-def amount(value):
-    """A money amount: whole numbers as int, others rounded to cents."""
-    out = num(value)
-    if out is None:
-        return None
-    return int(out) if float(out).is_integer() else round(out, 2)
 
 
 def positive(value):
@@ -46,35 +18,7 @@ def positive(value):
     return out if out else None
 
 
-def rating(value):
-    """A 0-5 star rating rounded to 2 places; 0 / missing -> None."""
-    out = num(value)
-    return round(out, 2) if out else None
-
-
 # ---- text -------------------------------------------------------------------------------
-
-def text(value):
-    """Whitespace-collapsed, HTML-unescaped string; '' -> None. Accepts the
-    site's {"text": ...} wrappers."""
-    if isinstance(value, dict):
-        value = value.get("text")
-    if value is None:
-        return None
-    out = " ".join(html_lib.unescape(str(value)).replace("\xa0", " ").split())
-    return out or None
-
-
-def multiline(value):
-    """Like text() but keeps line breaks (review bodies, descriptions)."""
-    if isinstance(value, dict):
-        value = value.get("text")
-    if value is None:
-        return None
-    lines = [" ".join(line.split()) for line in html_lib.unescape(str(value)).replace("\xa0", " ").splitlines()]
-    out = "\n".join(lines)
-    out = re.sub(r"\n{3,}", "\n\n", out).strip()
-    return out or None
 
 
 _SMALL_WORDS = {"and", "or", "of", "the", "in", "for", "to", "a", "on", "&"}
@@ -90,14 +34,6 @@ def code_label(value):
         return value
     words = re.sub(r"^[A-Za-z]+v\d+_", "", value).lower().split("_")
     return " ".join(w if (i and w in _SMALL_WORDS) else w.capitalize() for i, w in enumerate(words) if w) or None
-
-
-def lower_snake(value):
-    """'YEARLY' / 'Full-Time' -> 'yearly' / 'full_time'."""
-    value = text(value)
-    if not value:
-        return None
-    return re.sub(r"[^a-z0-9]+", "_", value.lower()).strip("_") or None
 
 
 # ---- dates -------------------------------------------------------------------------------
@@ -127,23 +63,6 @@ def local_date_ms(ms):
 
 
 _LONG_DATE_FORMATS = ("%B %d, %Y", "%b %d, %Y", "%d %B %Y", "%d %b %Y", "%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y")
-
-
-def iso_date(value):
-    """'September 22, 2026' / '2026-09-22T…' / '22 September 2026' -> '2026-09-22'.
-    Dates in other languages -> None."""
-    value = text(value)
-    if not value:
-        return None
-    match = re.match(r"(\d{4})-(\d{2})-(\d{2})", value)
-    if match:
-        return "-".join(match.groups())
-    for fmt in _LONG_DATE_FORMATS:
-        try:
-            return datetime.strptime(value, fmt).strftime("%Y-%m-%d")
-        except ValueError:
-            continue
-    return None
 
 
 def iso_minute(value):

@@ -45,3 +45,10 @@ def indeed_web_proxy():
 def indeed_graphql_proxy(fallback=False):
     """The Indeed app API runs direct; a retry after a failure uses INDEED_PROXY."""
     return INDEED_PROXY if fallback else None
+
+
+# ---- added by the sync: defaults for a direct run ----
+INDEED_BROWSER_SLOTS = 1
+def burst_slots(share):
+    return share
+

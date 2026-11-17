@@ -17,30 +17,7 @@ import re
 
 from indeed import refdata
 from indeed import shared as S
-
-
-def g(obj, *path, default=None):
-    """Safe nested get: g(d, "a", "b", 0) -> d["a"]["b"][0] or default."""
-    for step in path:
-        if isinstance(step, int):
-            if not isinstance(obj, list) or not -len(obj) <= step < len(obj):
-                return default
-            obj = obj[step]
-        else:
-            if not isinstance(obj, dict):
-                return default
-            obj = obj.get(step)
-        if obj is None:
-            return default
-    return obj
-
-
-def as_list(value):
-    return value if isinstance(value, list) else []
-
-
-def as_dict(value):
-    return value if isinstance(value, dict) else {}
+from scraper_utils.values import as_dict, as_list, g
 
 
 # ---- job attributes -------------------------------------------------------------------------
